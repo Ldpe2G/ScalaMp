@@ -16,21 +16,36 @@ import akka.dispatch.Futures
 
 object ScalaMp{
   
+ 
   val actorSystem = ActorSystem("ScalaMp")
+  
   val actorAdmin = actorSystem.actorOf(Props[ActorAdmin]) 
-  actorAdmin ! InitThreads
+   actorAdmin ! InitThreads
   
   var allRange: Option[Range] = None 
   var threadNum: Option[Int] = None
   
   implicit val timeout = Timeout(100 days)
   
+  //not work , program not stop after calling this function, don't know why
+  def Finalize = {
+     val result = actorAdmin ? KillAllWorkers
+     Await.result(result, Duration.Inf) match {
+        case Done => {
+            actorSystem.stop(actorAdmin)
+            println("shutdonw")
+            actorSystem.shutdown
+            
+        }
+      }
+  }
 	
+  //implement the critical region
 	def critical(region: => Unit) = {
-		actorAdmin ! CriticalRegion(() => region)
-		/*val resul = actorAdmin ? CriticalRegion(() => region)
-		Await.result(resul, Duration.Inf) match {
-  			case _ => 
+      actorAdmin ! CriticalRegion(() => region)
+		  /*val resul = actorAdmin ? CriticalRegion(() => region)
+		  Await.result(resul, Duration.Inf) match {
+  			 case Done =>  println("done")      
   		}*/
 	}
 	
@@ -42,28 +57,35 @@ object ScalaMp{
   				    	case _ =>
   					}
   				}
-  				actorAdmin ! KillAllWorkers
+  				actorAdmin ! ClearTmpWorkers
   			}
   		}
   	  
 	} 
 		
 	def each(opeartion: (Int, Int, Range) => Unit) = {
-			Await.result(startThread(EachSignal(allRange, opeartion)), Duration.Inf).asInstanceOf[TaskResult] match {
+			Await.result(startThread(EachSignal(allRange, opeartion, schedulee)), Duration.Inf).asInstanceOf[TaskResult] match {
   			case TaskResult(reslult) => {
   				reslult.foreach{
   					Await.result(_, Duration.Inf) match {
   				    	case _ =>
   					}
   				}
-  				actorAdmin ! KillAllWorkers
+  				actorAdmin ! ClearTmpWorkers
   			}
   		}
 	}
 	  
 	def parallel(mp: ScalaMp.type) = this
 	
-	def parallel_for(range: Range) = {
+  val DYNAMIC = -100
+  implicit val Default_Schecule_Static = static(DYNAMIC)
+  implicit val Default_Schecule_Dynamic = dynamic(DYNAMIC)
+  
+  var schedulee: schedule = Default_Schecule_Static
+  
+	def parallel_for(range: Range, schedule: schedule) = {
+    schedulee = schedule
 		allRange = Some(range)
 		this
 	}
@@ -77,6 +99,11 @@ object ScalaMp{
 
   
 }
+
+trait schedule
+case class static(num: Int) extends schedule
+case class dynamic(num: Int) extends schedule
+  
 
 class ActorAdmin extends Actor {
 	
@@ -94,8 +121,8 @@ class ActorAdmin extends Actor {
 	def receive = {
 	  
 	  case  CriticalRegion(region) => {
-		  region()
-		 // sender ! Done
+		     region()
+		     //sender ! Done
 	  }
 	  
 	  case InitThreads => {
@@ -106,90 +133,123 @@ class ActorAdmin extends Actor {
 	  
 	  case StartThread(threadNum, operation) => threadNum match {
 		    case Some(num) => {
-		    	if(num >= 0) {
 		    		if(num > 0){
 		    			val numm = if(num > MAX_THREAD_NUM) MAX_THREAD_NUM else num 
 		    			for(i <- 0 until numm) {
-		    				//val worker = context.actorOf(Props(new Worker(i)))
-		    				//workers += i -> worker
 		    				temp_workers += i -> workers_pool(i)
 		    			}
 		    		}
 		    		////////////////////////////
 		    		
 		    		 operation match {
-					    case OpSignal(op) => {
-					    	val threadNum = temp_workers.size
-			
-					    	if(threadNum > 0){
-					    		val result = temp_workers.map{case (id, worker) => worker ? OperationTask(threadNum, op)}
-					    		sender ! TaskResult(result)
-					    	}else child ! OpTask(op)
-					    }
-					    case EachSignal(range, op) => {
-					    	val threadNum = temp_workers.size
-					    	if(threadNum > 0){
-					    		val result = child ? Calculate(range, threadNum)
-					    		val senderr = sender // the position is important
-					    		result foreach{
-					    		  case IllegalRangeException => {}
-					    		  case RangeResult(range) => {
-					    			  val size = temp_workers.size
-
-					    			  val result = (0 until threadNum).map(i => {
-					    				  temp_workers(i) ? RangeTask(size, range(i), op) 
-					    			  })
-					    			  senderr ! TaskResult(result)
-					    		  }
-					    		}
-					    	}else child ! EachTask(range, op)
-					    }
+  					    case OpSignal(op) => {
+    					    	val threadNum = temp_workers.size
+    			
+    					    	if(threadNum == 0){
+                      temp_workers += 0 -> workers_pool(0)
+                    }
+                    val result = temp_workers.map{case (id, worker) => worker ? OperationTask(threadNum, op)}
+                    sender ! TaskResult(result)
+  					    }
+  					    case EachSignal(range, op, schedule) => {
+                    val size = temp_workers.size
+    					    	val threadNum =  if(size == 0){
+                        temp_workers += 0 -> workers_pool(0)
+                        1
+                    } else size
+                 
+    				    		val result = child ? Calculate(range, threadNum, schedule)
+    				    		val senderr = sender // the position is important
+    				    		result foreach{
+    					    		  case IllegalRangeException => {}
+    					    		  case RangeResult(range) => schedule match {
+                            case static(num) => {
+                                //println(range.size)
+                                val thread_num = temp_workers.size
+                                var index = 0
+                                val result =(List[Future[Any]]() /: range){ (acc, elem) =>
+                                      if(index >= thread_num) index = 0
+                                      val re = temp_workers(index) ? RangeTask(thread_num, elem, op) 
+                                      index += 1
+                                      acc :+ re
+                                  } 
+                                  senderr ! TaskResult(result)
+                            }
+                            case dynamic(num) => {
+                                val thread_num = temp_workers.size
+                                var index = 0
+                                val result =(List[Future[Any]]() /: range){ (acc, elem) =>
+                                    if(index >= thread_num) index = 0
+                                    val re = temp_workers(index) ? RangeTask(thread_num, elem, op) 
+                                    index += 1
+                                    acc :+ re
+                                } 
+                                senderr ! TaskResult(result)
+                            }
+    					    		  }
+    				    		}
+					      }
 		    		 }
-		    		
-		    		////////////////////////////
-		    	} else if(num < 0) sender ! IllegalThreadNumException
+		    
 		    }
 		    case None => sender ! IllegalThreadNumException
 	  }
-	  
-	  case EachTask(range, op) => range match {
-	    	case Some(r) => op(0, 1, r)
-	    	case None => // do nothing 
-	  } 
-	  
-	  case OpTask(op) => op(0, 1)
-	  
-	  case Calculate(range, threadNum) => range match {
+	      
+	  case Calculate(range, threadNum, schedule) => range match {
 	    	case Some(r) => {
-	    		val size = r.size
-	    		val chushu = size / threadNum
-	    		val yushu = size % threadNum
-	    		val step = chushu + 1
-	    		val left = step * yushu
-	    		
-	    		
-	    		val result = (IndexedSeq[IndexedSeq[Any]]() /: (0 until threadNum)) { (acc, i) =>
-	    			if(i < yushu) {
-	    				val temp = i * step
-	    				acc :+ (r drop temp take step)
-	    			} else {
-	    				acc :+ (r drop (left + (i - yushu) * chushu) take chushu)
-	    			} 
-	    		}    			 
-	    		sender ! RangeResult(result.toList.asInstanceOf[List[Range]])
+          val size = r.size
+          val result = schedule match {  
+              case static(num) => {
+                  if(num <= 0){
+                      val chushu = size / threadNum
+                      val yushu = size % threadNum
+                      val step = chushu + 1
+                      val left = step * yushu
+                      (IndexedSeq[IndexedSeq[Any]]() /: (0 until threadNum)) { (acc, i) =>
+                          if(i < yushu) {
+                              val temp = i * step
+                              acc :+ (r drop temp take step)
+                          } else {
+                              acc :+ (r drop (left + (i - yushu) * chushu) take chushu)
+                          } 
+                      }  
+                  }else{
+                      val chushu = size / num
+                      val yushu = size % num
+                      
+                      val tmp = 
+                        for(i <- 0 until chushu)
+                            yield r drop (i * num) take num
+                      if(yushu != 0)  tmp :+ r drop (chushu * num) take yushu 
+                      else tmp
+                  }
+              }  
+              case dynamic(num) => {
+                    val internal = if(num <= 0) 1 else num 
+                    val chushu = size / internal
+                    val yushu = size % internal
+                    val tmp = 
+                      for(i <- 0 until chushu)
+                          yield r drop (i * internal) take internal
+                    if(yushu != 0)  tmp :+ r drop (chushu * internal) take yushu   
+                    else tmp          
+              }
+          }
+          sender ! RangeResult(result.toList.asInstanceOf[List[Range]])
 	    	} 
 	    	case None => sender ! IllegalRangeException
 	  }
-	  case KillAllWorkers => {
-		 /*val size = temp_workers.size
-		 for(i <- 0 until size){
-			 val worker = temp_workers.remove(i).get
-			 context.stop(worker)
-		 }*/
-		 temp_workers.clear 
-		 //println("\n------------------- Done ----------------------\n")
-		 //sender ! Done
-	  }
+	  case ClearTmpWorkers => temp_workers.clear
+	  
+    case KillAllWorkers => {
+         val size = workers_pool.size
+         for(i <- 0 until size){
+             context.stop(workers_pool.remove(i).get)
+         }
+         context.stop(child)
+         sender ! Done
+    }
+    
  	  case _ =>
 	}
   
@@ -199,13 +259,12 @@ object ActorAdmin {
 	  trait Operation
 	  case class StartThread(threadNum: Option[Int], opeartion: Operation)
 	  case class OpSignal(op: (Int, Int) => Unit) extends Operation
-	  case class EachSignal(range: Option[Range], op: (Int, Int, Range) => Unit) extends Operation
+	  case class EachSignal(range: Option[Range], op: (Int, Int, Range) => Unit, schedule: schedule) extends Operation
 	 
-	  case class OpTask(op: (Int, Int) => Unit)
-	  case class EachTask(range: Option[Range], op: (Int, Int, Range) => Unit)
+	 
 	  case class TaskResult(futures: Iterable[Future[Any]])
 	  
-	  case class Calculate(range: Option[Range], threadNum: Int)
+	  case class Calculate(range: Option[Range], threadNum: Int, schedule: schedule)
 	  case class RangeResult(ranges: List[Range])
 	  case class CriticalRegion(region: () => Unit)
 	 	  
@@ -213,6 +272,7 @@ object ActorAdmin {
 	  case object IllegalThreadNumException
 	  case object StartThreadSuccess
 	  case object InitThreads
+    case object ClearTmpWorkers
 	  case object KillAllWorkers
 }
 
@@ -228,6 +288,7 @@ class Worker(id: Int) extends Actor {
   
 	val my_rank = id
   
+
 	def receive = {
 	  case OperationTask(threadNum, op) => {
 		  op(id, threadNum)
