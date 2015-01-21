@@ -52,43 +52,43 @@ object Main {
     println("parallel version: ")
     var global = 0.0
     val a = 0.0
-	val b = 20.0
-	val n = 10000000
-	val h = (b - a) / n
-	def f(x: Double) = x * x 
-	var start = System.currentTimeMillis
-	//
+    val b = 20.0
+    val n = 10000000
+    val h = (b - a) / n
+    def f(x: Double) = x * x 
+    var start = System.currentTimeMillis
+    //
     ScalaMp parallel_for(0 to n - 1, Default_Schecule_Static) withThread(100) each{ (my_rank, threadNum, range) =>
     
 	val cal_range = range.map(a + _ * h) 
 	val temp = (0.0 /: cal_range){ (acc, elem) => acc + f(elem) }
 	val size = range.size
 	val local_result = {
-		  val tr = temp - (f(cal_range(0)) + f(cal_range(size - 1))) / 2
-		  tr * h
+	     val tr = temp - (f(cal_range(0)) + f(cal_range(size - 1))) / 2
+	     tr * h
 	}
 	critical{
-		  global += local_result  
+	     global += local_result  
 	}  	
     }
     println(s"area = $global")
     println(s"parallel Time: ${System.currentTimeMillis - start} ms\n")
 
     println("serial version: ")
-	start = System.currentTimeMillis
-	val newRange = (0 until n).map(a + _ * h)
-	val ttemp = (0.0 /: newRange){ (acc, elem) => acc + f(elem) }
-	val result = {
-	  	val tr = ttemp - (f(newRange(0)) + f(newRange(n - 1))) / 2
-	  	tr * h
-	}
-	println(s"area = $result")
-	println(s"serial Time: ${System.currentTimeMillis - start} ms")
-  	*/
+    start = System.currentTimeMillis
+    val newRange = (0 until n).map(a + _ * h)
+    val ttemp = (0.0 /: newRange){ (acc, elem) => acc + f(elem) }
+    val result = {
+	     val tr = ttemp - (f(newRange(0)) + f(newRange(n - 1))) / 2
+	     tr * h
+    }
+    println(s"area = $result")
+    println(s"serial Time: ${System.currentTimeMillis - start} ms")
+    */
     
     /*
-	// example two
-	// 计算 pi 值  calculate the pi
+    // example two
+    // 计算 pi 值  calculate the pi
     println("calculate the pi: ")
     println("parallel version: ")
     var start = System.currentTimeMillis
@@ -102,7 +102,7 @@ object Main {
   	  	acc + temp
      	}
   	critical{ 
-  	  pi += local_result
+  	        pi += local_result
   	}
     }
     println(s"pi = ${pi * 4.0}")
@@ -113,9 +113,9 @@ object Main {
     val range = 0 until n
     var factor = if(range(0) % 2 == 0) 1.0 else -1.0
     val result = (0.0 /: range){ (acc, elem) =>
-	  	 val temp = factor / (2 * elem + 1) 
-	  	 factor = -factor
-	  	 acc + temp
+	   val temp = factor / (2 * elem + 1) 
+	   factor = -factor
+	   acc + temp
     }
     println(s"pi = ${result * 4.0}")
     println(s"serial Time: ${System.currentTimeMillis - start} ms\n")
@@ -228,8 +228,8 @@ object Main {
     */
 		
     /**
-	  // example five
-	  //	n 皇后问题  有  bug,  parallel n queens problem
+    // example five
+    //	n 皇后问题  有  bug,  parallel n queens problem
     println("parallel n queens problem: ")
     println("parallel version: ")
     val n_size = 10
