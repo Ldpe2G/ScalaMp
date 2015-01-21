@@ -41,15 +41,15 @@ object ScalaMp{
   }
 	
   //implement the critical region
-	def critical(region: => Unit) = {
+  def critical(region: => Unit) = {
       actorAdmin ! CriticalRegion(() => region)
-		  /*val resul = actorAdmin ? CriticalRegion(() => region)
-		  Await.result(resul, Duration.Inf) match {
-  			 case Done =>  println("done")      
-  		}*/
-	}
+	 /*val resul = actorAdmin ? CriticalRegion(() => region)
+	 Await.result(resul, Duration.Inf) match {
+  		 case Done =>  println("done")      
+  	 }*/
+   }
 	
-	def op(operation: (Int, Int) => Unit) = {
+   def op(operation: (Int, Int) => Unit) = {
   	  	Await.result(startThread(OpSignal(operation)), Duration.Inf).asInstanceOf[TaskResult] match {
   			case TaskResult(reslult) => {
   				reslult.foreach{
@@ -63,8 +63,8 @@ object ScalaMp{
   	  
 	} 
 		
-	def each(opeartion: (Int, Int, Range) => Unit) = {
-			Await.result(startThread(EachSignal(allRange, opeartion, schedulee)), Duration.Inf).asInstanceOf[TaskResult] match {
+    def each(opeartion: (Int, Int, Range) => Unit) = {
+		 Await.result(startThread(EachSignal(allRange, opeartion, schedulee)), Duration.Inf).asInstanceOf[TaskResult] match {
   			case TaskResult(reslult) => {
   				reslult.foreach{
   					Await.result(_, Duration.Inf) match {
@@ -74,28 +74,28 @@ object ScalaMp{
   				actorAdmin ! ClearTmpWorkers
   			}
   		}
-	}
+     }
 	  
-	def parallel(mp: ScalaMp.type) = this
+     def parallel(mp: ScalaMp.type) = this
 	
-  val DYNAMIC = -100
-  implicit val Default_Schecule_Static = static(DYNAMIC)
-  implicit val Default_Schecule_Dynamic = dynamic(DYNAMIC)
+     val DYNAMIC = -100
+     implicit val Default_Schecule_Static = static(DYNAMIC)
+     implicit val Default_Schecule_Dynamic = dynamic(DYNAMIC)
   
-  var schedulee: schedule = Default_Schecule_Static
+     var schedulee: schedule = Default_Schecule_Static
   
-	def parallel_for(range: Range, schedule: schedule) = {
-    schedulee = schedule
-		allRange = Some(range)
-		this
-	}
+     def parallel_for(range: Range, schedule: schedule) = {
+         schedulee = schedule
+	 allRange = Some(range)
+	 this
+     }
 	
-	def withThread(num: Int) = {
-		threadNum = Some(num)
-		this
-	}
+     def withThread(num: Int) = {
+	 threadNum = Some(num)
+	 this
+     }
 	
-  def startThread(opeartion: Operation) = actorAdmin ? StartThread(threadNum, opeartion)
+     def startThread(opeartion: Operation) = actorAdmin ? StartThread(threadNum, opeartion)
 
   
 }
@@ -146,49 +146,49 @@ class ActorAdmin extends Actor {
     					    	val threadNum = temp_workers.size
     			
     					    	if(threadNum == 0){
-                      temp_workers += 0 -> workers_pool(0)
-                    }
-                    val result = temp_workers.map{case (id, worker) => worker ? OperationTask(threadNum, op)}
-                    sender ! TaskResult(result)
+                                                     temp_workers += 0 -> workers_pool(0)
+                                                }
+                                                val result = temp_workers.map{case (id, worker) => worker ? OperationTask(threadNum, op)}
+                                                sender ! TaskResult(result)
   					    }
   					    case EachSignal(range, op, schedule) => {
-                    val size = temp_workers.size
+                                                val size = temp_workers.size
     					    	val threadNum =  if(size == 0){
-                        temp_workers += 0 -> workers_pool(0)
-                        1
-                    } else size
+                                                        temp_workers += 0 -> workers_pool(0)
+                                                        1
+                                                } else size
                  
     				    		val result = child ? Calculate(range, threadNum, schedule)
     				    		val senderr = sender // the position is important
     				    		result foreach{
     					    		  case IllegalRangeException => {}
     					    		  case RangeResult(range) => schedule match {
-                            case static(num) => {
-                                //println(range.size)
-                                val thread_num = temp_workers.size
-                                var index = 0
-                                val result =(List[Future[Any]]() /: range){ (acc, elem) =>
-                                      if(index >= thread_num) index = 0
-                                      val re = temp_workers(index) ? RangeTask(thread_num, elem, op) 
-                                      index += 1
-                                      acc :+ re
-                                  } 
-                                  senderr ! TaskResult(result)
-                            }
-                            case dynamic(num) => {
-                                val thread_num = temp_workers.size
-                                var index = 0
-                                val result =(List[Future[Any]]() /: range){ (acc, elem) =>
-                                    if(index >= thread_num) index = 0
-                                    val re = temp_workers(index) ? RangeTask(thread_num, elem, op) 
-                                    index += 1
-                                    acc :+ re
-                                } 
-                                senderr ! TaskResult(result)
-                            }
+                                                                 case static(num) => {
+                                                                 	//println(range.size)
+                                                                 	val thread_num = temp_workers.size
+                                                                 	var index = 0
+                                                                 	val result =(List[Future[Any]]() /: range){ (acc, elem) =>
+                                                                           if(index >= thread_num) index = 0
+                                                                           val re = temp_workers(index) ? RangeTask(thread_num, elem, op) 
+                                                                           index += 1
+                                      					   acc :+ re
+                                  					} 
+                                  					senderr ! TaskResult(result)
+                            					}
+                            					case dynamic(num) => {
+                        						 val thread_num = temp_workers.size
+                        						 var index = 0
+                        						 val result =(List[Future[Any]]() /: range){ (acc, elem) =>
+                                    						if(index >= thread_num) index = 0
+                                    						val re = temp_workers(index) ? RangeTask(thread_num, elem, op) 
+                                						index += 1
+                                    						acc :+ re
+                                					 } 
+                                					senderr ! TaskResult(result)
+                            					}
     					    		  }
     				    		}
-					      }
+					     }
 		    		 }
 		    
 		    }
