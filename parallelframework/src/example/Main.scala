@@ -9,11 +9,11 @@ object Main {
   
   def main(args: Array[String]): Unit = {
    
-	  // hello world	
-		ScalaMp parallel withThread(8) op{ (my_rank, threadNum) =>
-		 	  println(s"hello world , my_rank: $my_rank, threadNum: $threadNum")
-	  }
-		println
+     // hello world	
+     ScalaMp parallel withThread(8) op{ (my_rank, threadNum) =>
+	println(s"hello world , my_rank: $my_rank, threadNum: $threadNum")
+     }
+     println
     
     //schedule test
     //default static schedule
