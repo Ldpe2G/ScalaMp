@@ -30,6 +30,7 @@ Examples:
 
 2, calculate the pi, 计算pi值
 -------
+```scala
             var start = System.currentTimeMillis
             var pi = 0.0
             val n = 100000000
@@ -46,12 +47,12 @@ Examples:
 	         }
 		     println(s"pi = ${pi * 4.0}")
 		     println(s"parallel Time: ${System.currentTimeMillis - start}")
-
+```
 ###output:
-             
+```scala
              pi = 3.141592643589774
              parallel Time: 2485
-
+```
 
 
 more examples are in the example.Main.scala
