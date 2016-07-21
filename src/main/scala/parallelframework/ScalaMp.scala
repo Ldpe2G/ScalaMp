@@ -143,7 +143,7 @@ class ActorAdmin extends Actor {
               temp_workers += 0 -> workers_pool(0)
               1
             } else size
-	     val result = child ? Calculate(range, threadNum, schedule)
+	          val result = child ? Calculate(range, threadNum, schedule)
             val senderr = sender // the position is important
             result foreach {
               case IllegalRangeException => {}
