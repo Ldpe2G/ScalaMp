@@ -17,7 +17,7 @@ Examples:
 	        }
 ```
 ###output:
-
+```scala
             hello world , my_rank: 5, threadNum: 8
             hello world , my_rank: 0, threadNum: 8
             hello world , my_rank: 6, threadNum: 8
@@ -26,7 +26,7 @@ Examples:
             hello world , my_rank: 7, threadNum: 8
             hello world , my_rank: 2, threadNum: 8
             hello world , my_rank: 1, threadNum: 8
-
+```
 
 2, calculate the pi, 计算pi值
 -------
