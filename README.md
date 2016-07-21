@@ -7,7 +7,7 @@ Examples:
 =======
 
 1, Hello World:
--------
+```scala
 
             import parallelframework.ScalaMp
             import parallelframework.ScalaMp._
@@ -15,6 +15,7 @@ Examples:
             ScalaMp parallel withThread(8) op{ (my_rank, threadNum) =>
                 println(s"hello world , my_rank: $my_rank, threadNum: $threadNum")
 	        }
+```
 ###output:
 
             hello world , my_rank: 5, threadNum: 8
