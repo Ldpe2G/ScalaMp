@@ -1,4 +1,4 @@
-ScalaMp V1.0.1
+ScalaMp V1.0.2
 =======
 
 a simple parallel computing framework  inspired by openmp and  implemented in scala
