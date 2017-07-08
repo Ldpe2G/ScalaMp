@@ -63,6 +63,6 @@ more examples are in the example.Main.scala
 Some limitations (future works):
 =======
 
-###1, thread num must be large than 0 and less equal than 100,  threadNum > 0 && threadNum <= 100
-###2, critical section may not implemented correctly
-###3, only implement the static and dynamic schedule strategies, like the schedule[] directive in openmp, my not implemented correctly
+### 1, thread num must be large than 0 and less equal than 100,  threadNum > 0 && threadNum <= 100
+### 2, critical section may not implemented correctly
+### 3, only implement the static and dynamic schedule strategies, like the schedule[] directive in openmp, my not implemented correctly
